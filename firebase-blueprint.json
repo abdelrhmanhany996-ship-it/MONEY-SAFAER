@@ -1,0 +1,146 @@
+{
+  "entities": {
+    "courses": {
+      "title": "Courses",
+      "description": "Training courses offered by Saber Group Academy",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "subtitle": { "type": "string" },
+        "category": { "type": "string" },
+        "instructor": { "type": "string" },
+        "progress": { "type": "number" },
+        "studentsCount": { "type": "number" },
+        "maxStudents": { "type": "number" },
+        "duration": { "type": "string" },
+        "status": { "type": "string" },
+        "price": { "type": "number" },
+        "level": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["title", "category", "instructor", "price"]
+    },
+    "clients": {
+      "title": "Clients and Students",
+      "description": "Enrolled students and corporate training clients",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "type": { "type": "string" },
+        "typeLabel": { "type": "string" },
+        "coursesEnrolled": { "type": "array", "items": { "type": "string" } },
+        "totalPaid": { "type": "number" },
+        "initials": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["name", "phone", "type"]
+    },
+    "tasks": {
+      "title": "Tasks",
+      "description": "Operational and executive tasks with scheduling and kanban status",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "assignee": { "type": "string" },
+        "priority": { "type": "string" },
+        "column": { "type": "string" },
+        "courseOrProject": { "type": "string" },
+        "dueDate": { "type": "string" },
+        "scheduledDate": { "type": "string" },
+        "time": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["title", "column"]
+    },
+    "invoices": {
+      "title": "Invoices",
+      "description": "Billing invoices and payment collection records",
+      "type": "object",
+      "properties": {
+        "invoiceNumber": { "type": "string" },
+        "clientName": { "type": "string" },
+        "courseOrService": { "type": "string" },
+        "date": { "type": "string" },
+        "amount": { "type": "number" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["invoiceNumber", "clientName", "amount", "status"]
+    },
+    "users": {
+      "title": "Users",
+      "description": "Authenticated Gmail user profiles and settings",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "lastLoginAt": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["uid", "email"]
+    },
+    "wallets": {
+      "title": "Wallets",
+      "description": "Financial accounts and liquidity balances",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "type": { "type": "string" },
+        "typeLabel": { "type": "string" },
+        "balance": { "type": "number" },
+        "currency": { "type": "string" },
+        "badge": { "type": "string" }
+      },
+      "required": ["name", "balance", "type"]
+    },
+    "transactions": {
+      "title": "Transactions",
+      "description": "Financial income and expense movement records",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "category": { "type": "string" },
+        "amount": { "type": "number" },
+        "type": { "type": "string" },
+        "date": { "type": "string" },
+        "walletName": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["title", "amount", "type"]
+    }
+  },
+  "firestore": {
+    "/courses/{courseId}": {
+      "schema": { "$ref": "#/entities/courses" },
+      "description": "Academy training courses collection"
+    },
+    "/clients/{clientId}": {
+      "schema": { "$ref": "#/entities/clients" },
+      "description": "Enrolled students and companies collection"
+    },
+    "/tasks/{taskId}": {
+      "schema": { "$ref": "#/entities/tasks" },
+      "description": "Academy operational tasks and kanban cards"
+    },
+    "/invoices/{invoiceId}": {
+      "schema": { "$ref": "#/entities/invoices" },
+      "description": "Issued invoices and payment receipts"
+    },
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/users" },
+      "description": "Authenticated user profiles in Firestore"
+    },
+    "/wallets/{walletId}": {
+      "schema": { "$ref": "#/entities/wallets" },
+      "description": "Financial wallets and bank balances"
+    },
+    "/transactions/{transactionId}": {
+      "schema": { "$ref": "#/entities/transactions" },
+      "description": "Cashflow transactions ledger"
+    }
+  }
+}
