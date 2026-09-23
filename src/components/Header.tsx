@@ -17,6 +17,7 @@ import {
   LogOut,
   ChevronDown,
   Settings,
+  Globe,
 } from 'lucide-react';
 import { NotificationItem, TabType } from '../types';
 import { PWAInstallButton } from './PWAInstallButton';
@@ -39,6 +40,8 @@ interface HeaderProps {
   userPhoto?: string | null;
   isAuthenticated?: boolean;
   onLoginWithGoogle?: () => void;
+  onOpenAuthModal?: () => void;
+  onOpenEmployeeMgmtModal?: () => void;
   onLogout?: () => void;
   onToggleSidebar?: () => void;
   onOpenSearchFilter?: () => void;
@@ -46,6 +49,8 @@ interface HeaderProps {
   currentLanguage?: Language;
   currentCurrency?: string;
   onSaveSettings?: (newLang: Language, newCurrency: string) => void;
+  userRole?: 'admin' | 'employee';
+  onToggleRole?: () => void;
 }
 
 export default function Header({
@@ -59,11 +64,13 @@ export default function Header({
   isDbConnected = true,
   theme,
   onToggleTheme,
-  userEmail = 'abdelrhmanhany996@gmail.com',
-  userName = 'عبد الرحمن هاني',
+  userEmail = 'saber.group@accounting.com',
+  userName = 'مجموعة صابر المحاسبية',
   userPhoto,
   isAuthenticated = true,
   onLoginWithGoogle,
+  onOpenAuthModal,
+  onOpenEmployeeMgmtModal,
   onLogout,
   onToggleSidebar,
   onOpenSearchFilter,
@@ -71,6 +78,8 @@ export default function Header({
   currentLanguage = 'ar',
   currentCurrency = 'EGP',
   onSaveSettings,
+  userRole = 'admin',
+  onToggleRole,
 }: HeaderProps) {
   const [showSearch, setShowSearch] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -105,7 +114,7 @@ export default function Header({
                   <img src={userPhoto} alt={userName} className="w-6 h-6 rounded-lg object-cover shrink-0" />
                 ) : (
                   <div className="w-6 h-6 rounded-lg bg-emerald-600 text-white flex items-center justify-center text-[11px] font-black shrink-0">
-                    G
+                    {userName.charAt(0)}
                   </div>
                 )}
                 <div className="text-right hidden sm:block">
@@ -121,17 +130,15 @@ export default function Header({
               </button>
             ) : (
               <button
-                onClick={onLoginWithGoogle}
-                className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black transition-all cursor-pointer shadow-sm active:scale-95"
+                onClick={onOpenAuthModal || onLoginWithGoogle}
+                className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs font-black transition-all cursor-pointer shadow-sm active:scale-95"
               >
-                <div className="w-5 h-5 rounded-md bg-white text-emerald-700 flex items-center justify-center text-[11px] font-black">
-                  G
-                </div>
-                <span>تسجيل الدخول بـ Gmail</span>
+                <User className="w-4 h-4" />
+                <span>تسجيل الدخول / مدير وموظف</span>
               </button>
             )}
 
-            {/* Google Account Modal Dropdown */}
+            {/* Google / Account Modal Dropdown */}
             {showAccountModal && isAuthenticated && (
               <div className="absolute right-0 mt-2 w-72 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl p-4 z-50 animate-in fade-in zoom-in-95 duration-150">
                 <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
@@ -140,12 +147,14 @@ export default function Header({
                       <img src={userPhoto} alt={userName} className="w-8 h-8 rounded-xl object-cover shrink-0" />
                     ) : (
                       <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-black">
-                        G
+                        {userName.charAt(0)}
                       </div>
                     )}
                     <div>
                       <h4 className="font-black text-slate-900 dark:text-white text-xs">{userName}</h4>
-                      <p className="text-[10px] text-slate-500 dark:text-slate-400">حساب موثق في Firestore</p>
+                      <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                        {userRole === 'admin' ? '🛡️ مدير النظام العام' : '💼 موظف عمليات'}
+                      </p>
                     </div>
                   </div>
                   <button
@@ -161,7 +170,7 @@ export default function Header({
                     <div className="flex items-center justify-between text-slate-600 dark:text-slate-300 font-medium">
                       <span className="flex items-center gap-1.5">
                         <Mail className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                        <span>بريد Gmail:</span>
+                        <span>البريد المسجل:</span>
                       </span>
                       <ShieldCheck className="w-4 h-4 text-emerald-500" />
                     </div>
@@ -170,12 +179,18 @@ export default function Header({
                     </span>
                   </div>
 
-                  <div className="flex items-center justify-between p-2 rounded-xl bg-emerald-50/50 dark:bg-emerald-950/20 text-emerald-800 dark:text-emerald-300 font-bold text-[11px]">
-                    <span>قاعدة البيانات:</span>
-                    <span className="px-2 py-0.5 rounded-md bg-emerald-200 dark:bg-emerald-900 text-emerald-900 dark:text-emerald-100">
-                      Firebase Firestore آمنة
-                    </span>
-                  </div>
+                  {userRole === 'admin' && onOpenEmployeeMgmtModal && (
+                    <button
+                      onClick={() => {
+                        setShowAccountModal(false);
+                        onOpenEmployeeMgmtModal();
+                      }}
+                      className="w-full p-2.5 rounded-xl bg-purple-50 dark:bg-purple-950/50 hover:bg-purple-100 text-purple-900 dark:text-purple-300 border border-purple-200 dark:border-purple-800/80 font-black text-xs flex items-center justify-between transition-colors cursor-pointer"
+                    >
+                      <span>إدارة وإضافة حسابات الموظفين</span>
+                      <User className="w-4 h-4 text-purple-600" />
+                    </button>
+                  )}
                 </div>
 
                 <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex flex-col gap-2">
@@ -240,14 +255,52 @@ export default function Header({
             </button>
           )}
 
-          {/* Dark Mode Toggle Button */}
+          {/* Role Switcher Toggle Button (Admin / Employee) */}
+          <button
+            onClick={onToggleRole}
+            className={`px-3 py-1.5 rounded-xl border text-xs font-black flex items-center gap-1.5 transition-all duration-150 active:scale-95 cursor-pointer shadow-2xs ${
+              userRole === 'admin'
+                ? 'bg-purple-50 dark:bg-purple-950/50 text-purple-800 dark:text-purple-300 border-purple-200 dark:border-purple-800 hover:bg-purple-100'
+                : 'bg-blue-50 dark:bg-blue-950/50 text-blue-800 dark:text-blue-300 border-blue-200 dark:border-blue-800 hover:bg-blue-100'
+            }`}
+            title="انقر للتبديل بين واجهة المدير وواجهة الموظف"
+          >
+            <ShieldCheck className="w-3.5 h-3.5" />
+            <span>{userRole === 'admin' ? 'مدير النظام 🛡️' : 'واجهة الموظف 👤'}</span>
+          </button>
+          <button
+            onClick={() => {
+              const nextLang: Language = currentLanguage === 'ar' ? 'en' : 'ar';
+              if (onSaveSettings) onSaveSettings(nextLang, currentCurrency);
+            }}
+            className="px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-emerald-500 text-slate-800 dark:text-slate-100 font-black text-xs flex items-center gap-1.5 transition-all duration-150 active:scale-95 cursor-pointer shadow-2xs"
+            title={currentLanguage === 'ar' ? 'Switch to English' : 'التحويل إلى اللغة العربية'}
+          >
+            <Globe className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+            <span>{currentLanguage === 'ar' ? 'العربية' : 'English'}</span>
+          </button>
+
+          {/* Dark / Light Mode Toggle Button */}
           <button
             onClick={onToggleTheme}
-            className="w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-amber-400 dark:hover:border-amber-400 text-amber-600 dark:text-amber-400 flex items-center justify-center transition-all duration-150 active:scale-95 cursor-pointer"
-            title={theme === 'dark' ? 'التحول للوضع الفاتح' : 'التحول للوضع الداكن (Dark Mode)'}
+            className="px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-amber-400 dark:hover:border-amber-400 text-amber-600 dark:text-amber-400 font-bold text-xs flex items-center gap-1.5 transition-all duration-150 active:scale-95 cursor-pointer shadow-2xs"
+            title={theme === 'dark' ? 'الوضع الحالي: داكن (انقر للتحويل للفاتح)' : 'الوضع الحالي: فاتح (انقر للتحويل للداكن)'}
           >
-            {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4 text-slate-700" />}
+            {theme === 'dark' ? (
+              <>
+                <Moon className="w-4 h-4 text-amber-300" />
+                <span className="text-[11px] font-black text-amber-300">الوضع الداكن 🌙</span>
+              </>
+            ) : (
+              <>
+                <Sun className="w-4 h-4 text-amber-600" />
+                <span className="text-[11px] font-black text-slate-700">الوضع الفاتح ☀️</span>
+              </>
+            )}
           </button>
+
+          {/* PWA Install Button for Mobile & Desktop */}
+          <PWAInstallButton />
 
           {/* Quick Search */}
           {showSearch ? (

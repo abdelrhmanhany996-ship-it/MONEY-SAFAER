@@ -8,9 +8,14 @@ import BudgetsAndGoalsView from './components/qershnat/BudgetsAndGoalsView';
 import TrustsAndGuardianView from './components/qershnat/TrustsAndGuardianView';
 import DailyLifeAndAssetsView from './components/qershnat/DailyLifeAndAssetsView';
 import SmartToolsAnalyticsView from './components/qershnat/SmartToolsAnalyticsView';
+import CompanyAcademyView from './components/qershnat/CompanyAcademyView';
+import PayrollHRView from './components/qershnat/PayrollHRView';
 import AddModal from './components/AddModal';
 import FinancialAlertBanner from './components/FinancialAlertBanner';
 import AiOrganizationModal from './components/AiOrganizationModal';
+import AuthModal, { EmployeeAccount } from './components/AuthModal';
+import EmployeeManagementModal from './components/EmployeeManagementModal';
+import SelectEmployeeModal from './components/SelectEmployeeModal';
 import { OfflineIndicator } from './components/OfflineIndicator';
 import {
   INITIAL_WALLETS,
@@ -18,6 +23,9 @@ import {
   INITIAL_INSTALLMENTS,
   INITIAL_TASKS,
   INITIAL_NOTIFICATIONS,
+  INITIAL_COURSES,
+  INITIAL_CLIENTS,
+  INITIAL_INVOICES,
 } from './data/initialData';
 import {
   TabType,
@@ -36,6 +44,9 @@ import {
   OccasionGift,
   AssetDocument,
   NotificationItem,
+  Course,
+  ClientOrStudent,
+  Invoice,
 } from './types';
 import {
   seedInitialDataIfEmpty,
@@ -45,6 +56,10 @@ import {
   saveTransaction,
   updateWalletBalance,
   updateAllWalletsCurrency,
+  saveCourse,
+  saveClient,
+  saveInvoice,
+  updateInstallmentStatus,
 } from './lib/databaseService';
 import { User } from 'firebase/auth';
 import {
@@ -88,11 +103,127 @@ export default function App() {
     document.documentElement.lang = language;
   }, [language]);
 
+  // User Role State ('admin' vs 'employee')
+  const [userRole, setUserRole] = useState<'admin' | 'employee'>(() => {
+    return (localStorage.getItem('saber_active_user_role') as 'admin' | 'employee') || 'admin';
+  });
+  const [activeUserName, setActiveUserName] = useState<string>(() => {
+    return localStorage.getItem('saber_active_user_name') || 'مجموعة صابر المحاسبية';
+  });
+  const [activeUserEmail, setActiveUserEmail] = useState<string>(() => {
+    return localStorage.getItem('saber_active_user_email') || 'saber.group@accounting.com';
+  });
+
+  // Modals for Auth & Employee Access Control
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isEmployeeMgmtModalOpen, setIsEmployeeMgmtModalOpen] = useState(false);
+  const [isSelectEmployeeModalOpen, setIsSelectEmployeeModalOpen] = useState(false);
+
+  // Employees List State (Managed by Manager)
+  const [employees, setEmployees] = useState<EmployeeAccount[]>(() => {
+    const local = localStorage.getItem('saber_group_employees');
+    if (local) {
+      try { return JSON.parse(local); } catch (e) {}
+    }
+    return [
+      {
+        id: 'emp-101',
+        name: 'م. أحمد جودة',
+        email: 'ahmed@sabergroup.com',
+        passwordHash: 'emp123',
+        code: 'EMP-101',
+        role: 'employee',
+        department: 'محاسب مبيعات وعملاء',
+        createdAt: '2026-09-01',
+        createdBy: 'المدير العام',
+        active: true,
+      },
+      {
+        id: 'emp-102',
+        name: 'سارة إبراهيم',
+        email: 'sara@sabergroup.com',
+        passwordHash: 'emp123',
+        code: 'EMP-102',
+        role: 'employee',
+        department: 'إداري الأكاديمية والكورسات',
+        createdAt: '2026-09-10',
+        createdBy: 'المدير العام',
+        active: true,
+      },
+    ];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('saber_group_employees', JSON.stringify(employees));
+  }, [employees]);
+
+  const handleAddEmployee = (newEmp: EmployeeAccount) => {
+    setEmployees((prev) => [newEmp, ...prev]);
+    showToast(`تم حفظ وتفعيل حساب الموظف ${newEmp.name} بنجاح ✓`);
+  };
+
+  const handleRemoveEmployee = (id: string) => {
+    setEmployees((prev) => prev.filter((e) => e.id !== id));
+    showToast('تم حذف حساب الموظف.');
+  };
+
+  const handleToggleActiveEmployee = (id: string) => {
+    setEmployees((prev) =>
+      prev.map((e) => (e.id === id ? { ...e, active: !e.active } : e))
+    );
+    showToast('تم تحديث حالة حساب الموظف.');
+  };
+
+  const handleSuccessAuth = (user: {
+    uid: string;
+    email: string;
+    displayName: string;
+    role: 'admin' | 'employee';
+  }) => {
+    setUserRole(user.role);
+    setActiveUserName(user.displayName);
+    setActiveUserEmail(user.email);
+    localStorage.setItem('saber_active_user_name', user.displayName);
+    localStorage.setItem('saber_active_user_email', user.email);
+    localStorage.setItem('saber_active_user_role', user.role);
+    showToast(
+      user.role === 'admin'
+        ? `أهلاً بك يا ${user.displayName}! تم دخول المدير العام 🛡️`
+        : `أهلاً بك يا ${user.displayName}! تم تسجيل دخول الموظف 👤`
+    );
+  };
+
+  const handleSelectEmployeeAccount = (emp: EmployeeAccount) => {
+    setUserRole('employee');
+    setActiveUserName(emp.name);
+    setActiveUserEmail(emp.email);
+    localStorage.setItem('saber_active_user_name', emp.name);
+    localStorage.setItem('saber_active_user_email', emp.email);
+    localStorage.setItem('saber_active_user_role', 'employee');
+    showToast(`تم تسجيل الدخول بصفتك الموظف: ${emp.name} (${emp.department}) ✓`);
+  };
+
+  const handleToggleRole = () => {
+    if (userRole === 'admin') {
+      // Opening Employee Selector Modal for Manager
+      setIsSelectEmployeeModalOpen(true);
+    } else {
+      // Switch back to Admin General Manager
+      setUserRole('admin');
+      setActiveUserName('مجموعة صابر المحاسبية');
+      setActiveUserEmail('saber.group@accounting.com');
+      localStorage.setItem('saber_active_user_name', 'مجموعة صابر المحاسبية');
+      localStorage.setItem('saber_active_user_email', 'saber.group@accounting.com');
+      localStorage.setItem('saber_active_user_role', 'admin');
+      showToast('تم التحويل إلى واجهة المدير العام (كامل الصلاحيات) 🛡️');
+    }
+  };
+
   // AI Advisor Modal State
   const [isAiAdvisorOpen, setIsAiAdvisorOpen] = useState(false);
 
   // Navigation & Layout State
-  const [activeTab, setActiveTab] = useState<TabType>('wallets_transactions');
+  const [activeTab, setActiveTab] = useState<TabType>('general_ledger');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
@@ -277,6 +408,11 @@ export default function App() {
     },
   ]);
 
+  // Company & Academy Data State
+  const [courses, setCourses] = useState<Course[]>(INITIAL_COURSES);
+  const [clients, setClients] = useState<ClientOrStudent[]>(INITIAL_CLIENTS);
+  const [invoices, setInvoices] = useState<Invoice[]>(INITIAL_INVOICES);
+
   // Firebase Auth User State
   const [authUser, setAuthUser] = useState<User | null>(null);
 
@@ -336,14 +472,29 @@ export default function App() {
   };
 
   const handleLogout = async () => {
-    await logoutUser();
-    showToast('تم تسجيل الخروج بنجاح ✓');
+    try {
+      await logoutUser();
+    } catch (e) {
+      console.error('Logout error:', e);
+    }
+    setAuthUser(null);
+    setActiveUserName('');
+    setActiveUserEmail('');
+    localStorage.removeItem('saber_active_user_name');
+    localStorage.removeItem('saber_active_user_email');
+    localStorage.removeItem('saber_active_user_role');
+    showToast('تم تسجيل الخروج بنجاح. يمكنك الدخول الآن كـ مدير أو موظف.');
+    setIsAuthModalOpen(true);
   };
 
   const handleSaveSettings = async (newLang: Language, newCurr: string) => {
     setLanguage(newLang);
     setPreferredCurrency(newCurr);
+    localStorage.setItem('qershnat_language', newLang);
     localStorage.setItem('qershnat_currency', newCurr);
+
+    document.documentElement.dir = newLang === 'ar' ? 'rtl' : 'ltr';
+    document.documentElement.lang = newLang;
 
     // Update all wallets in local state
     const updated = wallets.map((w) => ({
@@ -361,8 +512,8 @@ export default function App() {
 
     showToast(
       newLang === 'ar'
-        ? `تم تحديث اللغة إلى (${newLang === 'ar' ? 'العربية' : 'English'}) والعملة المفضلة إلى (${newCurr}) عبر كافـة المحافظ بنجاح ✓`
-        : `Language updated to English & preferred currency set to (${newCurr}) across all wallets successfully ✓`
+        ? `تم تحديث لغة التطبيق إلى (العربية) والعملة المفضلة إلى (${newCurr}) بنجاح ✓`
+        : `App language set to English & preferred currency updated to (${newCurr}) successfully ✓`
     );
   };
 
@@ -563,6 +714,77 @@ export default function App() {
     setTasks((prev) => [t, ...prev]);
   };
 
+  const handleAddCourse = async (courseData: Partial<Course>) => {
+    const newCourse: Course = {
+      id: courseData.id || 'c_' + Date.now(),
+      title: courseData.title || 'دورة جديدة',
+      subtitle: courseData.subtitle || 'دورة تدريبية متقدمة',
+      category: courseData.category || 'برمجة وتطوير',
+      instructor: courseData.instructor || 'أستاذ المحاضر',
+      price: courseData.price || 3000,
+      duration: courseData.duration || '8 أسابيع',
+      studentsCount: courseData.studentsCount || 1,
+      maxStudents: courseData.maxStudents || 30,
+      progress: courseData.progress || 0,
+      status: 'active',
+      level: courseData.level || 'متوسط',
+    };
+    setCourses((prev) => [newCourse, ...prev]);
+    await saveCourse(newCourse);
+  };
+
+  const handleAddClient = async (clientData: Partial<ClientOrStudent>) => {
+    const newClient: ClientOrStudent = {
+      id: clientData.id || 'st_' + Date.now(),
+      name: clientData.name || 'طالب جديد',
+      email: clientData.email || 'student@academy.com',
+      phone: clientData.phone || '01000000000',
+      type: clientData.type || 'student',
+      typeLabel: clientData.typeLabel || 'متدرب',
+      coursesEnrolled: clientData.coursesEnrolled || ['دورة عامة'],
+      totalPaid: clientData.totalPaid || 0,
+      initials: clientData.initials || 'طج',
+    };
+    setClients((prev) => [newClient, ...prev]);
+    await saveClient(newClient);
+  };
+
+  const handleAddInvoice = async (invData: Partial<Invoice>) => {
+    const newInv: Invoice = {
+      id: invData.id || 'inv_' + Date.now(),
+      invoiceNumber: invData.invoiceNumber || 'INV-' + Math.floor(1000 + Math.random() * 9000),
+      clientName: invData.clientName || 'عميل شركة',
+      courseOrService: invData.courseOrService || 'خدمات تدريبية وحلول برمجية',
+      date: invData.date || new Date().toISOString().split('T')[0],
+      amount: invData.amount || 0,
+      status: invData.status || 'paid',
+    };
+    setInvoices((prev) => [newInv, ...prev]);
+    await saveInvoice(newInv);
+  };
+
+  const handleUpdateInstallmentStatus = async (
+    id: string,
+    paidAmount: number,
+    remainingAmount: number,
+    status: 'paid' | 'pending' | 'overdue'
+  ) => {
+    setInstallments((prev) =>
+      prev.map((inst) =>
+        inst.id === id
+          ? {
+              ...inst,
+              paidAmount,
+              remainingAmount,
+              status,
+              lastPaymentDate: new Date().toISOString().split('T')[0],
+            }
+          : inst
+      )
+    );
+    await updateInstallmentStatus(id, status, paidAmount, remainingAmount);
+  };
+
   const handleAddNote = (note: Partial<NotebookEntry>) => {
     const n: NotebookEntry = {
       id: `n_${Date.now()}`,
@@ -620,6 +842,7 @@ export default function App() {
           isDbConnected={isDbConnected}
           collapsed={sidebarCollapsed}
           onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
+          language={language}
         />
       </div>
 
@@ -640,6 +863,7 @@ export default function App() {
               isDbConnected={isDbConnected}
               collapsed={false}
               onToggleCollapse={() => setMobileSidebarOpen(false)}
+              language={language}
             />
           </div>
         </div>
@@ -664,17 +888,21 @@ export default function App() {
           isDbConnected={isDbConnected}
           theme={theme}
           onToggleTheme={toggleTheme}
-          userEmail={authUser?.email || 'abdelrhmanhany996@gmail.com'}
-          userName={authUser?.displayName || 'عبد الرحمن هاني'}
+          userEmail={activeUserEmail || authUser?.email || 'saber.group@accounting.com'}
+          userName={activeUserName || authUser?.displayName || (userRole === 'admin' ? 'مجموعة صابر (المدير العام)' : 'موظف العمليات')}
           userPhoto={authUser?.photoURL || null}
-          isAuthenticated={!!authUser || true}
+          isAuthenticated={!!authUser || !!activeUserEmail}
           onLoginWithGoogle={handleLoginWithGoogle}
+          onOpenAuthModal={() => setIsAuthModalOpen(true)}
+          onOpenEmployeeMgmtModal={() => setIsEmployeeMgmtModalOpen(true)}
           onLogout={handleLogout}
           onToggleSidebar={() => setMobileSidebarOpen(true)}
           onOpenAiAdvisor={() => setIsAiAdvisorOpen(true)}
           currentLanguage={language}
           currentCurrency={preferredCurrency}
           onSaveSettings={handleSaveSettings}
+          userRole={userRole}
+          onToggleRole={handleToggleRole}
         />
 
         {/* Financial Warning Alert Banner */}
@@ -690,10 +918,10 @@ export default function App() {
 
         <main className="flex-1 w-full max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 pt-4 pb-16 print:p-0">
           <AnimatePresence mode="wait">
-            {/* 1. Wallets & Transactions View */}
-            {activeTab === 'wallets_transactions' && (
+            {/* 1. General Ledger & Accounts View */}
+            {(activeTab === 'general_ledger' || activeTab === 'wallets_transactions') && (
               <motion.div
-                key="wallets_transactions"
+                key="general_ledger"
                 initial={{ opacity: 0, y: 4 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -4 }}
@@ -709,10 +937,38 @@ export default function App() {
               </motion.div>
             )}
 
-            {/* 2. Debts, Installments & Money Circles View */}
-            {activeTab === 'debts_and_circles' && (
+            {/* 2. Sales & Receivables View */}
+            {activeTab === 'sales_receivables' && (
               <motion.div
-                key="debts_and_circles"
+                key="sales_receivables"
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                transition={{ duration: 0.12 }}
+              >
+                <CompanyAcademyView
+                  courses={courses}
+                  clients={clients}
+                  installments={installments}
+                  invoices={invoices}
+                  tasks={tasks}
+                  onAddCourse={handleAddCourse}
+                  onAddClient={handleAddClient}
+                  onAddInvoice={handleAddInvoice}
+                  onAddTask={handleAddTask}
+                  onUpdateInstallment={handleUpdateInstallmentStatus}
+                  onAddTransaction={handleAddTransaction}
+                  showToast={showToast}
+                  currency={preferredCurrency}
+                  userRole={userRole}
+                />
+              </motion.div>
+            )}
+
+            {/* 3. Purchases & Payables View */}
+            {(activeTab === 'purchases_payables' || activeTab === 'debts_and_circles') && (
+              <motion.div
+                key="purchases_payables"
                 initial={{ opacity: 0, y: 4 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -4 }}
@@ -730,51 +986,10 @@ export default function App() {
               </motion.div>
             )}
 
-            {/* 3. Budgets & Financial Goals View */}
-            {activeTab === 'budgets_and_goals' && (
+            {/* 4. Inventory & Warehouses View */}
+            {(activeTab === 'inventory' || activeTab === 'daily_life_assets') && (
               <motion.div
-                key="budgets_and_goals"
-                initial={{ opacity: 0, y: 4 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -4 }}
-                transition={{ duration: 0.12 }}
-              >
-                <BudgetsAndGoalsView
-                  budgets={budgets}
-                  goals={goals}
-                  onAddBudget={handleAddBudget}
-                  onAddGoal={handleAddGoal}
-                  onContributeGoal={handleContributeGoal}
-                  showToast={showToast}
-                />
-              </motion.div>
-            )}
-
-            {/* 4. Trusts, Guardian Vault & Privacy View */}
-            {activeTab === 'trusts_and_guardian' && (
-              <motion.div
-                key="trusts_and_guardian"
-                initial={{ opacity: 0, y: 4 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -4 }}
-                transition={{ duration: 0.12 }}
-              >
-                <TrustsAndGuardianView
-                  trusts={trusts}
-                  guardians={guardians}
-                  sharedList={sharedList}
-                  onAddTrust={handleAddTrust}
-                  onAddGuardian={handleAddGuardian}
-                  onAddSharedAccess={handleAddSharedAccess}
-                  showToast={showToast}
-                />
-              </motion.div>
-            )}
-
-            {/* 5. Daily Life, Notebook, Occasions & Vehicle Log View */}
-            {activeTab === 'daily_life_assets' && (
-              <motion.div
-                key="daily_life_assets"
+                key="inventory"
                 initial={{ opacity: 0, y: 4 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -4 }}
@@ -794,10 +1009,75 @@ export default function App() {
               </motion.div>
             )}
 
-            {/* 6. Smart Tools, AI Assistant & Zakat View */}
-            {activeTab === 'smart_tools_analytics' && (
+            {/* 5. Treasury & Banking View */}
+            {activeTab === 'banking' && (
               <motion.div
-                key="smart_tools_analytics"
+                key="banking"
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                transition={{ duration: 0.12 }}
+              >
+                <WalletsTransactionsView
+                  wallets={wallets}
+                  transactions={transactions}
+                  onAddTransaction={handleAddTransaction}
+                  onAddWallet={handleAddWallet}
+                  showToast={showToast}
+                />
+              </motion.div>
+            )}
+
+            {/* 6. Academy & Courses View */}
+            {activeTab === 'business' && (
+              <motion.div
+                key="business"
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                transition={{ duration: 0.12 }}
+              >
+                <CompanyAcademyView
+                  courses={courses}
+                  clients={clients}
+                  installments={installments}
+                  invoices={invoices}
+                  tasks={tasks}
+                  onAddCourse={handleAddCourse}
+                  onAddClient={handleAddClient}
+                  onAddInvoice={handleAddInvoice}
+                  onAddTask={handleAddTask}
+                  onUpdateInstallment={handleUpdateInstallmentStatus}
+                  onAddTransaction={handleAddTransaction}
+                  showToast={showToast}
+                  currency={preferredCurrency}
+                  userRole={userRole}
+                />
+              </motion.div>
+            )}
+
+            {/* 7. Payroll & HR System View */}
+            {activeTab === 'payroll_hr' && (
+              <motion.div
+                key="payroll_hr"
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                transition={{ duration: 0.12 }}
+              >
+                <PayrollHRView
+                  onAddTransaction={handleAddTransaction}
+                  showToast={showToast}
+                  currency={preferredCurrency}
+                  userRole={userRole}
+                />
+              </motion.div>
+            )}
+
+            {/* 8. Financial Reports & Cost Centers View */}
+            {(activeTab === 'financial_reports' || activeTab === 'smart_tools_analytics') && (
+              <motion.div
+                key="financial_reports"
                 initial={{ opacity: 0, y: 4 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -4 }}
@@ -811,9 +1091,80 @@ export default function App() {
                 />
               </motion.div>
             )}
+
+            {/* Extra fallback views if accessed */}
+            {activeTab === 'budgets_and_goals' && (
+              <motion.div
+                key="budgets_and_goals"
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                transition={{ duration: 0.12 }}
+              >
+                <BudgetsAndGoalsView
+                  budgets={budgets}
+                  goals={goals}
+                  onAddBudget={handleAddBudget}
+                  onAddGoal={handleAddGoal}
+                  onContributeGoal={handleContributeGoal}
+                  showToast={showToast}
+                />
+              </motion.div>
+            )}
+
+            {activeTab === 'trusts_and_guardian' && (
+              <motion.div
+                key="trusts_and_guardian"
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                transition={{ duration: 0.12 }}
+              >
+                <TrustsAndGuardianView
+                  trusts={trusts}
+                  guardians={guardians}
+                  sharedList={sharedList}
+                  onAddTrust={handleAddTrust}
+                  onAddGuardian={handleAddGuardian}
+                  onAddSharedAccess={handleAddSharedAccess}
+                  showToast={showToast}
+                />
+              </motion.div>
+            )}
           </AnimatePresence>
         </main>
       </div>
+
+      {/* Authentication & Access Control Modal */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        onSuccessAuth={handleSuccessAuth}
+        onLoginWithGoogle={handleLoginWithGoogle}
+        employeesList={employees}
+        language={language}
+      />
+
+      {/* Employee Management Modal for Admin */}
+      <EmployeeManagementModal
+        isOpen={isEmployeeMgmtModalOpen}
+        onClose={() => setIsEmployeeMgmtModalOpen(false)}
+        employees={employees}
+        onAddEmployee={handleAddEmployee}
+        onRemoveEmployee={handleRemoveEmployee}
+        onToggleActiveEmployee={handleToggleActiveEmployee}
+        language={language}
+      />
+
+      {/* Select Employee Account Modal */}
+      <SelectEmployeeModal
+        isOpen={isSelectEmployeeModalOpen}
+        onClose={() => setIsSelectEmployeeModalOpen(false)}
+        employees={employees}
+        onSelectEmployee={handleSelectEmployeeAccount}
+        onOpenAddEmployeeModal={() => setIsEmployeeMgmtModalOpen(true)}
+        language={language}
+      />
 
       {/* AI Organization Advisor Modal */}
       <AiOrganizationModal

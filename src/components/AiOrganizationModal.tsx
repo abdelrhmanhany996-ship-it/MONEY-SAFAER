@@ -14,6 +14,7 @@ import {
   RefreshCw,
   Zap,
 } from 'lucide-react';
+import { GoogleGenAI } from '@google/genai';
 import { Wallet, Transaction, BudgetItem, DebtItem } from '../types';
 
 interface AiOrganizationModalProps {
@@ -38,7 +39,7 @@ export default function AiOrganizationModal({
   >([
     {
       sender: 'ai',
-      text: 'أهلاً بك يا عبد الرحمن! أنا مستشار الذكاء الاصطناعي الخاص بك لتنظيم أموالك وحياتك. لقد قمت بتحليل جميع محافظك، معملاتك، وميزانياتك الحالية. كيف يمكنني مساعدتك اليوم في إعادة هيكلة وتنظيم أموالك؟',
+      text: 'أهلاً بك في مستشار مجموعة صابر المالي الذكي (Saber Group AI Advisor)! لقد قمت بتحليل جميع الخزائن، الحسابات، التدفقات النقدية، والأقساط المستحقة. كيف يمكنني مساعدتك اليوم في التخطيط المالي وتوزيع الميزانيات؟',
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     },
   ]);
@@ -73,71 +74,101 @@ export default function AiOrganizationModal({
     (a, b) => b[1] - a[1]
   );
 
-  const handleSendMessage = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (!inputQuery.trim() || isLoading) return;
+  const executeAiQuery = async (queryText: string) => {
+    if (!queryText.trim() || isLoading) return;
 
-    const userText = inputQuery.trim();
     const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-    setMessages((prev) => [...prev, { sender: 'user', text: userText, time: timeStr }]);
+    setMessages((prev) => [...prev, { sender: 'user', text: queryText, time: timeStr }]);
     setInputQuery('');
     setIsLoading(true);
 
     try {
-      // Direct call to Gemini API or smart response generator
-      const promptText = `أنت مستشار مالي ذكي لتطبيق "قرشنات" باللغة العربية.
-بيانات المستخدم الحالية:
-- إجمالي الرصيد في المحافظ: ${totalBalance} ج.م
-- إجمالي الدخل: ${totalIncome} ج.م
-- إجمالي المصروفات: ${totalExpense} ج.م
-- الديون التي عليه (التزامات): ${totalDebtPayable} ج.م
-- الديون التي له (مستحقات): ${totalDebtReceivable} ج.م
-- أعلى 3 مصاريف: ${sortedExpenseCategories.slice(0, 3).map(([c, a]) => `${c}: ${a} ج.م`).join(', ')}
+      const promptText = `أنت مستشار مالي ومحاسبي استراتيجي بذكاء خارق يعمل لدى "مجموعة صابر للمحاسبة ERP (Saber Group for Accounting)".
+بيانات الشركة والسيولة المالية الحالية:
+- إجمالي الرصيد والسيولة بالخزائن والمحافظ: ${totalBalance.toLocaleString()} ج.م
+- إجمالي الإيرادات والدخل: ${totalIncome.toLocaleString()} ج.م
+- إجمالي المصروفات والعموميات: ${totalExpense.toLocaleString()} ج.م
+- المستحقات والديون التي على الشركة (التزامات): ${totalDebtPayable.toLocaleString()} ج.م
+- المستحقات التي للشركة لدى العملاء والطلبة: ${totalDebtReceivable.toLocaleString()} ج.م
+- أعلى فئات المصاريف إنفاقاً: ${sortedExpenseCategories.slice(0, 3).map(([c, a]) => `${c}: ${a} ج.م`).join(', ') || 'لا يوجد مصاريف مسجلة'}
 
-سؤال المستخدم: "${userText}"
+استفسار المستخدم: "${queryText}"
 
-يرجى إعطاء إجابة ماليّة ودقيقة ومنظمة ومحددة باللغة العربية مع خطوات عملية لتنظيم المال.`;
-
-      const response = await fetch('/api/gemini/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: promptText }),
-      });
+يرجى تقديم تحليلات محاسبية دقيقة، خطوات عملية مرتبة بأرقام، ونصائح استراتيجية لتنمية الأرباح وضبط السيولة والتأكد من تحصيل المتبقي من الطلاب والعملاء باللغة العربية البسيطة والمحترفة.`;
 
       let aiReply = '';
-      if (response.ok) {
-        const data = await response.json();
-        aiReply = data.text || data.reply;
+
+      // Try GoogleGenAI SDK directly if key is available
+      const apiKey = (import.meta as any).env?.VITE_GEMINI_API_KEY || (process as any).env?.GEMINI_API_KEY;
+      if (apiKey) {
+        try {
+          const ai = new GoogleGenAI({ apiKey });
+          const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: promptText,
+          });
+          aiReply = response.text || '';
+        } catch (genAiErr) {
+          console.warn('GoogleGenAI SDK call fallback:', genAiErr);
+        }
       }
 
       if (!aiReply) {
-        // Rule-based fallback if API endpoint is standard client side
-        if (userText.includes('توفير') || userText.includes('ادخار')) {
-          aiReply = `لتوفير المال بناءً على تحليلاتك الحالية:\n1. خفّض مصاريف فئة (${sortedExpenseCategories[0]?.[0] || 'المصاريف المتغيرة'}) التي استهلكت ${sortedExpenseCategories[0]?.[1] || 0} ج.م هذا الشهر.\n2. خصص 20% من دخلك (${Math.round(totalIncome * 0.2)} ج.م) للادخار التلقائي في محفظة طوارئ.\n3. استخدم قاعدة الميزانية المقسمة (50% ضروريات - 30% رغبات - 20% ادخار).`;
-        } else if (userText.includes('ديون') || userText.includes('أقساط')) {
-          aiReply = `تنظيم الديون والأقساط:\n1. إجمالي الالتزامات عليك هو ${totalDebtPayable} ج.م.\n2. يُفضل استخدام طريقة "كرة الثلج": ابدأ بسداد أصغر دين أولاً للحصول على دافع نفسي.\n3. قم بجدولة الأقساط المستحقة قبل مواعيدها بـ 3 أيام لتجنب أي غرامات تأخير.`;
+        // High-intelligence fallback generator tailored to query
+        const textLower = queryText.toLowerCase();
+        if (textLower.includes('مصاريف') || textLower.includes('تنظيم') || textLower.includes('توفير')) {
+          aiReply = `📊 **تحليل وترشيد المصروفات لمجموعة صابر:**
+
+1️⃣ **ترشيد الفئة الأكثر استهلاكاً:** تم ملاحظة أن فئة (${sortedExpenseCategories[0]?.[0] || 'المصروفات التشغيلية'}) استهلكت مبلغ ${sortedExpenseCategories[0]?.[1]?.toLocaleString() || '1,200'} ج.م. يُنصح بوضع سقف محدد لها عند ${Math.round((sortedExpenseCategories[0]?.[1] || 1000) * 0.8).toLocaleString()} ج.م.
+2️⃣ **النسبة الذهبية للسيولة:** احرص على ألا تزيد النفقات التشغيلية عن 65% من إجمالي الإيرادات المحصلة (${totalIncome.toLocaleString()} ج.م).
+3️⃣ **جدولة الدفعات:** اربط أي مصروفات متغيرة بتواريخ استلام أقساط الكورسات وعروض المبيعات لضمان عدم حدوث عجز بالخزينة.`;
+        } else if (textLower.includes('50/30/20') || textLower.includes('توزيع') || textLower.includes('راتب')) {
+          aiReply = `💡 **التوزيع الهيكلي الذكي لدخلك وإيراداتك (${totalIncome.toLocaleString()} ج.م):**
+
+• 🏦 **50% التشغيل والالتزامات الأساسية:** (${Math.round(totalIncome * 0.5).toLocaleString()} ج.م) — لتغطية الإيجار، رواتب الموظفين، والمرافق.
+• 📈 **30% التطوير والتسويق للكورسات:** (${Math.round(totalIncome * 0.3).toLocaleString()} ج.م) — لتحديث القاعات، الإعلانات، ومعدات التدريب.
+• 🛡️ **20% الاحتياطي والادخار للسيولة:** (${Math.round(totalIncome * 0.2).toLocaleString()} ج.م) — يتم إيداعها فورياً في حساب البنك للحالات الطارئة.`;
+        } else if (textLower.includes('ديون') || textLower.includes('مستحقات') || textLower.includes('أقساط')) {
+          aiReply = `🎯 **استراتيجية تحصيل المستحقات وسداد الالتزامات:**
+
+1️⃣ **المستحقات التي لك لدى العملاء والطلبة:** لديك ${totalDebtReceivable.toLocaleString()} ج.م مستحقة. يُنصح بإرسال تنبيهات تلقائية عبر الأكاديمية لتحصيل الأقساط قبل نهاية الشهر.
+2️⃣ **الالتزامات المستحقة عليك:** إجمالي الالتزامات ${totalDebtPayable.toLocaleString()} ج.م. ابدأ بسداد الالتزامات ذات الأولوية العالية عبر طريقة "كرة الثلج".
+3️⃣ **تسوية الخزينة:** تأكد من إدخال كافة سندات القبض والصرف في شاشة الخزينة لتحديث الأرصدة أولاً بأول.`;
         } else {
-          aiReply = `نصيحة تنظيمية شاملة لأموالك:\n- رصيدك الحالي (${totalBalance.toLocaleString()} ج.م) يتطلب توزيعاً متوازناً بين المحافظ.\n- احرص على ألا تتجاوز المصروفات الشهرية حاجز 70% من إجمالي الدخل.\n- يمكنك إضافة ميزانية محددة لكل فئة إنفاق لتنبيهك فور الوصول لـ 80% من الحد المسموح.`;
+          aiReply = `📌 **تقرير المستشار المالي الذكي (Saber Group ERP):**
+
+- **إجمالي السيولة المتاحة بالخزائن:** ${totalBalance.toLocaleString()} ج.م.
+- **صافي الفارق المالي:** ${(totalIncome - totalExpense).toLocaleString()} ج.م (الإيرادات ${totalIncome.toLocaleString()} ج.م - المصروفات ${totalExpense.toLocaleString()} ج.م).
+- **التوصية الفورية:** استغل السيولة الحالية لتسوية الأقساط العاجلة وتعزيز صندوق التحوط المالي للأكاديمية.`;
         }
       }
 
       setMessages((prev) => [
         ...prev,
-        { sender: 'ai', text: aiReply, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) },
+        {
+          sender: 'ai',
+          text: aiReply,
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        },
       ]);
     } catch (err) {
       setMessages((prev) => [
         ...prev,
         {
           sender: 'ai',
-          text: 'بناءً على بياناتك المالية: ننصحك بتركيز الإنفاق على الضروريات فقط، وتقسيم الدخل بنسبة 50% للالتزامات، 30% للمصاريف، و 20% للادخار.',
+          text: 'بناءً على تحليلات السيولة في مجموعة صابر: نوصي بتركيز الإنفاق على الأولويات، وتحصيل الأقساط المتبقية من الطلبة لرفع رصيد الخزينة.',
           time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         },
       ]);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleSendMessage = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    executeAiQuery(inputQuery);
   };
 
   return (
@@ -151,13 +182,13 @@ export default function AiOrganizationModal({
             </div>
             <div>
               <h2 className="text-base sm:text-lg font-black tracking-tight flex items-center gap-2">
-                <span>مستشار التنظيم بالذكاء الاصطناعي</span>
+                <span>مستشار مجموعة صابر المالي بالذكاء الاصطناعي</span>
                 <span className="text-[10px] bg-amber-400 text-slate-950 font-black px-2 py-0.5 rounded-full">
                   AI Advisor
                 </span>
               </h2>
               <p className="text-xs text-purple-200">
-                مُساعدك الشخصي لإعادة هيكلة وتنظيم الميزانيات، المحافظ، والديون
+                مُساعدك الذكي لإعادة هيكلة وتنظيم الميزانيات، الخزائن، وأقساط الكورسات
               </p>
             </div>
           </div>
@@ -222,10 +253,8 @@ export default function AiOrganizationModal({
               ].map((chip, idx) => (
                 <button
                   key={idx}
-                  onClick={() => {
-                    setInputQuery(chip);
-                  }}
-                  className="px-3 py-1 rounded-xl bg-white dark:bg-slate-800 border border-purple-200 dark:border-purple-900/50 text-purple-700 dark:text-purple-300 text-[11px] font-bold hover:bg-purple-50 dark:hover:bg-purple-950/50 transition-colors cursor-pointer shadow-2xs"
+                  onClick={() => executeAiQuery(chip)}
+                  className="px-3 py-1 rounded-xl bg-white dark:bg-slate-800 border border-purple-200 dark:border-purple-900/50 text-purple-700 dark:text-purple-300 text-[11px] font-bold hover:bg-purple-50 dark:hover:bg-purple-950/50 transition-colors cursor-pointer shadow-2xs active:scale-95"
                 >
                   💡 {chip}
                 </button>
@@ -273,7 +302,7 @@ export default function AiOrganizationModal({
               {isLoading && (
                 <div className="flex items-center gap-2 text-purple-600 dark:text-purple-400 text-xs font-bold p-3 bg-purple-50 dark:bg-purple-950/40 rounded-2xl w-fit animate-pulse">
                   <RefreshCw className="w-4 h-4 animate-spin" />
-                  <span>الذكاء الاصطناعي يفكر ويحلل بياناتك...</span>
+                  <span>الذكاء الاصطناعي يفكر ويحلل بياناتك المالية...</span>
                 </div>
               )}
             </div>
@@ -284,7 +313,7 @@ export default function AiOrganizationModal({
                 type="text"
                 value={inputQuery}
                 onChange={(e) => setInputQuery(e.target.value)}
-                placeholder="اسأل المستشار الذكي عن أي نصيحة لتنظيم أموالك..."
+                placeholder="اسأل المستشار الذكي عن أي نصيحة لتنظيم أموالك وخزائنك..."
                 className="flex-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl px-4 py-2.5 text-xs sm:text-sm text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-purple-500"
               />
               <button
@@ -308,38 +337,38 @@ export default function AiOrganizationModal({
                 <span>الخطة الذكية لتوزيع الميزانيات (قاعدة 50/30/20)</span>
               </h3>
               <p>
-                بناءً على دخل المسجل هذا الشهر (<span className="font-bold text-emerald-600">{totalIncome.toLocaleString()} ج.م</span>)، قام الذكاء الاصطناعي بحساب التوزيع الأمثل لدخلك:
+                بناءً على الدخل والإيرادات المحصلة (<span className="font-bold text-emerald-600">{totalIncome.toLocaleString()} ج.م</span>)، قام الذكاء الاصطناعي بحساب التوزيع الأمثل للسيولة:
               </p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <div className="p-4 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-2xs">
-                <div className="text-xs font-bold text-blue-600 dark:text-blue-400 mb-1">50% الاحتياجات والضروريات</div>
+                <div className="text-xs font-bold text-blue-600 dark:text-blue-400 mb-1">50% المصاريف والالتزامات الأساسية</div>
                 <div className="text-lg font-black text-slate-900 dark:text-white">
-                  {Math.round(totalIncome * 0.5).toLocaleString()} ج.م
+                  {Math.round(totalIncome * 0.5).toLocaleString()} ج.m
                 </div>
                 <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                  إيجار، فواتير كهرباء ومياه، طعام أساسي، ومصاريف علاجية.
+                  إيجار المعهد، فواتير الكهرباء والمياه، ورواتب الموظفين الأساسية.
                 </p>
               </div>
 
               <div className="p-4 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-2xs">
-                <div className="text-xs font-bold text-amber-600 dark:text-amber-400 mb-1">30% المصاريف المتغيرة والترفيه</div>
+                <div className="text-xs font-bold text-amber-600 dark:text-amber-400 mb-1">30% التطوير والخدمات</div>
                 <div className="text-lg font-black text-slate-900 dark:text-white">
                   {Math.round(totalIncome * 0.3).toLocaleString()} ج.م
                 </div>
                 <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                  مطاعم، خروج، تسوق، واشتراكات ترفيهية.
+                  تجهيزات القاعات، التكاليف التشغيلية، والدعايات للكورسات.
                 </p>
               </div>
 
               <div className="p-4 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-2xs">
-                <div className="text-xs font-bold text-emerald-600 dark:text-emerald-400 mb-1">20% الادخار والاستثمار</div>
+                <div className="text-xs font-bold text-emerald-600 dark:text-emerald-400 mb-1">20% الادخار والاحتياطي المالي</div>
                 <div className="text-lg font-black text-slate-900 dark:text-white">
                   {Math.round(totalIncome * 0.2).toLocaleString()} ج.م
                 </div>
                 <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                  صندوق الطوارئ، سداد القروض والمستحقات، والاستثمار.
+                  احتياطي الخزينة، صندوق الطوارئ، وتوسعات مجموعة صابر.
                 </p>
               </div>
             </div>
@@ -352,13 +381,13 @@ export default function AiOrganizationModal({
                 <li className="flex items-start gap-2">
                   <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
                   <span>
-                    تم رصد ارتفاع بإنفاق فئة ({sortedExpenseCategories[0]?.[0] || 'المصروفات العامة'})، يوصى بوضع حد أقصى له بقيمة {Math.round((sortedExpenseCategories[0]?.[1] || 1000) * 0.85)} ج.م.
+                    تم رصد أن أعلى إنفاق هو فئة ({sortedExpenseCategories[0]?.[0] || 'المصروفات العمومية'})، يوصى بوضع سقف محدد لها بقيمة {Math.round((sortedExpenseCategories[0]?.[1] || 1000) * 0.85).toLocaleString()} ج.م.
                   </span>
                 </li>
                 <li className="flex items-start gap-2">
                   <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
                   <span>
-                    قم بتحويل مبلغ الادخار الشهري ({Math.round(totalIncome * 0.2)} ج.م) فور استلام الدخل مباشرة لتجنب إنفاقه.
+                    قم بتحويل مبلغ الاحتياطي المالي ({Math.round(totalIncome * 0.2).toLocaleString()} ج.م) فور استلام تحصيلات الكورسات مباشرة لتأمين السيولة.
                   </span>
                 </li>
               </ul>
@@ -372,25 +401,28 @@ export default function AiOrganizationModal({
             <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 text-slate-800 dark:text-slate-200 text-xs">
               <h3 className="font-black text-sm text-amber-900 dark:text-amber-300 mb-1 flex items-center gap-2">
                 <AlertTriangle className="w-4 h-4 text-amber-600" />
-                <span>خطة الذكاء الاصطناعي للتخلص من الأقساط والديون</span>
+                <span>خطة الذكاء الاصطناعي لإدارة المستحقات والالتزامات</span>
               </h3>
               <p>
-                إجمالي الديون والالتزامات المستحقة عليك: <span className="font-bold text-rose-600 dark:text-rose-400">{totalDebtPayable.toLocaleString()} ج.م</span>
+                إجمالي الالتزامات المستحقة: <span className="font-bold text-rose-600 dark:text-rose-400">{totalDebtPayable.toLocaleString()} ج.م</span> | إجمالي المستحقات لك لدى الطلاب والعملاء: <span className="font-bold text-emerald-600">{totalDebtReceivable.toLocaleString()} ج.م</span>
               </p>
             </div>
 
             <div className="space-y-2">
-              {debts.filter(d => d.direction === 'payable').map((debt) => {
+              {debts.map((debt) => {
                 const remaining = debt.totalAmount - debt.paidAmount;
+                const isReceivable = debt.direction === 'receivable';
                 return (
                   <div key={debt.id} className="p-3.5 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-between">
                     <div>
                       <h4 className="font-bold text-xs text-slate-900 dark:text-slate-100">{debt.personName}</h4>
-                      <span className="text-[11px] text-slate-500 dark:text-slate-400">تاريخ الاستحقاق: {debt.dueDate}</span>
+                      <span className="text-[11px] text-slate-500 dark:text-slate-400">تاريخ الاستحقاق: {debt.dueDate} ({isReceivable ? 'مستحق لك' : 'التزام عليك'})</span>
                     </div>
                     <div className="text-left">
-                      <span className="font-black text-rose-600 dark:text-rose-400 text-sm block">{remaining.toLocaleString()} ج.م</span>
-                      <span className="text-[10px] bg-rose-100 dark:bg-rose-900/50 text-rose-800 dark:text-rose-300 font-bold px-2 py-0.5 rounded-full">أولوية سداد عالية</span>
+                      <span className={`font-black text-sm block ${isReceivable ? 'text-emerald-600' : 'text-rose-600'}`}>{remaining.toLocaleString()} ج.م</span>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isReceivable ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>
+                        {isReceivable ? 'تحصيل مرتقب' : 'سداد عاجل'}
+                      </span>
                     </div>
                   </div>
                 );
@@ -402,3 +434,4 @@ export default function AiOrganizationModal({
     </div>
   );
 }
+

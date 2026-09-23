@@ -1,10 +1,18 @@
 @import "tailwindcss";
 
+@variant dark (&:where(.dark, .dark *));
+
 @layer base {
   body {
     font-family: 'Cairo', system-ui, -apple-system, sans-serif;
     background-color: #f8fafc;
     color: #0f172a;
+    transition: background-color 0.2s ease, color 0.2s ease;
+  }
+
+  .dark body {
+    background-color: #0f172a;
+    color: #f8fafc;
   }
 }
 
@@ -16,10 +24,16 @@
 ::-webkit-scrollbar-track {
   background: #f1f5f9;
 }
+.dark ::-webkit-scrollbar-track {
+  background: #0f172a;
+}
 ::-webkit-scrollbar-thumb {
   background: #cbd5e1;
   border-radius: 9999px;
 }
+.dark ::-webkit-scrollbar-thumb {
+  background: #334155;
+}
 ::-webkit-scrollbar-thumb:hover {
-  background: #2563eb;
+  background: #059669;
 }

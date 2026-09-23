@@ -76,12 +76,13 @@ export default defineConfig(() => {
         includeAssets: ['icon.svg', 'apple-touch-icon.png', 'pwa-192x192.png', 'pwa-512x512.png'],
         manifest: {
           id: '/',
-          name: 'تطبيق قرشنات - إدارتك المالية الشاملة',
-          short_name: 'قرشنات',
-          description: 'تطبيق قرشنات الشامل لإدارة الأموال والتنظيم: المحافظ، الديون والأقساط، الميزانيات، الأمانات والوصايا، التنظيم اليومي، والمساعد الذكي',
+          name: 'Saber Group for Accounting - مجموعة صابر للمحاسبة',
+          short_name: 'Saber Group',
+          description: 'النظام المحاسبي والمالي الشامل لمجموعة صابر: المحافظ، الكورسات والطلاب، الفواتير والأقساط، مراكز التكلفة وإدارة الموظفين والمدراء',
           theme_color: '#059669',
           background_color: '#0f172a',
           display: 'standalone',
+          orientation: 'portrait',
           start_url: '/',
           scope: '/',
           lang: 'ar',
@@ -108,6 +109,7 @@ export default defineConfig(() => {
           ]
         },
         workbox: {
+          maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
           globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
           runtimeCaching: [
             {

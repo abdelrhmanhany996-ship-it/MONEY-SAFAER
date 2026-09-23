@@ -1,34 +1,55 @@
 export type TabType =
-  | 'dashboard'
-  | 'wallets_tx'
-  | 'wallets_transactions'
-  | 'debts_circles'
-  | 'debts_and_circles'
-  | 'budgets_goals'
-  | 'budgets_and_goals'
-  | 'trusts_guardian'
-  | 'trusts_and_guardian'
-  | 'daily_life'
-  | 'daily_life_assets'
-  | 'smart_tools'
-  | 'smart_tools_analytics'
-  | 'bank_sms_apps'
-  | 'home'
-  | 'business'
-  | 'money'
-  | 'expenses'
-  | 'installments'
-  | 'cashflow'
-  | 'daily_report'
   | 'general_ledger'
   | 'sales_receivables'
   | 'purchases_payables'
   | 'inventory'
   | 'banking'
+  | 'business'
+  | 'payroll_hr'
   | 'financial_reports'
+  | 'wallets_transactions'
+  | 'debts_and_circles'
+  | 'budgets_and_goals'
+  | 'trusts_and_guardian'
+  | 'daily_life_assets'
+  | 'smart_tools_analytics'
+  | 'dashboard'
+  | 'wallets_tx'
+  | 'debts_circles'
+  | 'budgets_goals'
+  | 'trusts_guardian'
+  | 'daily_life'
+  | 'smart_tools'
+  | 'home'
+  | 'money'
+  | 'expenses'
+  | 'installments'
+  | 'cashflow'
+  | 'daily_report'
   | 'more';
 
-export type UserRole = 'manager' | 'accountant';
+export type UserRole = 'manager' | 'accountant' | 'admin' | 'employee';
+
+// ==========================================
+// PAYROLL & HR (المرتبات والموارد البشرية)
+// ==========================================
+export interface EmployeePayroll {
+  id: string;
+  employeeCode: string;
+  name: string;
+  position: string;
+  department: string;
+  phone: string;
+  email: string;
+  hireDate: string;
+  basicSalary: number;
+  allowances: number;
+  deductions: number;
+  netSalary: number;
+  paymentStatus: 'paid' | 'pending';
+  lastPaidDate?: string;
+  bankAccountOrWallet?: string;
+}
 
 // ==========================================
 // 1. GENERAL LEDGER (الحسابات العامة)
